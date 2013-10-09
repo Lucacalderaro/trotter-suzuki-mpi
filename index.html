@@ -1,0 +1,89 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <title>Trotter-suzuki-mpi by peterwittek</title>
+
+    <link rel="stylesheet" href="stylesheets/styles.css">
+    <link rel="stylesheet" href="stylesheets/pygment_trac.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+    <!--[if lt IE 9]>
+    <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+  </head>
+  <body>
+    <div class="wrapper">
+      <header>
+        <h1>Trotter-suzuki-mpi</h1>
+        <p>Distributed Trotter-Suzuki solver</p>
+
+        <p class="view"><a href="https://github.com/peterwittek/trotter-suzuki-mpi">View the Project on GitHub <small>peterwittek/trotter-suzuki-mpi</small></a></p>
+
+
+        <ul>
+          <li><a href="https://github.com/peterwittek/trotter-suzuki-mpi/zipball/master">Download <strong>ZIP File</strong></a></li>
+          <li><a href="https://github.com/peterwittek/trotter-suzuki-mpi/tarball/master">Download <strong>TAR Ball</strong></a></li>
+          <li><a href="https://github.com/peterwittek/trotter-suzuki-mpi">View On <strong>GitHub</strong></a></li>
+        </ul>
+      </header>
+      <section>
+        <h1>
+<a name="distributed-trotter-suzuki-solver" class="anchor" href="#distributed-trotter-suzuki-solver"><span class="octicon octicon-link"></span></a>Distributed Trotter-Suzuki Solver</h1>
+
+<p>This is a distributed variant of efficient implementations of a simple Trotter-Suzuki solver. The kernels are based on the efficient <a href="https://bitbucket.org/zzzoom/trottersuzuki">implementation</a> by 
+Carlos Bederián</p>
+
+<h1>
+<a name="dependencies" class="anchor" href="#dependencies"><span class="octicon octicon-link"></span></a>Dependencies</h1>
+
+<p>CUDA and an MPI implementation are required for compiling. It also require a GPU with at least Compute Cabapility 2.0 for the CUDA kernel to execute.</p>
+
+<h1>
+<a name="usage" class="anchor" href="#usage"><span class="octicon octicon-link"></span></a>Usage</h1>
+
+<p>A test example is included. Usage: trottertest [OPTIONS]. </p>
+
+<p>Arguments:</p>
+
+<pre><code>-d NUMBER     Matrix dimension (default: 640)
+-i NUMBER     Number of iterations (default: 1000)
+-k NUMBER     Kernel type (default: 0): 
+                0: CPU, cache-optimized
+                1: CPU, SSE and cache-optimized
+                2: GPU
+                3: Hybrid CPU-GPU (experimental)                    
+-s NUMBER     Snapshots are taken at every NUMBER of iterations.
+                Zero means no snapshots. Default: 0.
+</code></pre>
+
+<p>Example:</p>
+
+<pre><code>mpirun -np 4 build/trottertest -k 0 -i 100 -d 640 -s 10
+</code></pre>
+
+<p>In case of the SSE kernel, the chunk of the matrix assigned to a node, that is a tile, must have a width that is divisible by two. This puts a constraint on the possible matrix sizes. For instance, running twelve MPI threads in a 4x3 configuration, the dimensions must be divisible by six and eight.</p>
+
+<p>The hybrid kernel is experimental. It splits the work between the GPU and the CPU. It uses one MPI thread per GPU, and uses OpenMP to use parallelism on the CPU. It is efficient if the matrix does not fit the GPU memory. For instance, given twelve physical cores in a single node with two Tesla C2050 GPUs, a 14,000x14,000 would not fit the GPU memory. The following command would calculate the part that does not fit the device memory on the CPU:</p>
+
+<pre><code>OMP_NUM_THREADS=6 mpirun -np 2 build/trottertest -k 3 -i 100 -d 14000
+</code></pre>
+
+<p>The included shell script single2double.sh generates a double precision variant. Executing it will overwrite the single precision source code.</p>
+
+<h1>
+<a name="citation" class="anchor" href="#citation"><span class="octicon octicon-link"></span></a>Citation</h1>
+
+<p>Further details are available in the following paper:</p>
+
+<p>Wittek, P. and Cucchietti, F.M. (2013). <a href="http://dx.doi.org/10.1016/j.cpc.2012.12.008">A Second-Order Distributed Trotter-Suzuki Solver with a Hybrid CPU-GPU Kernel</a>. Computer Physics Communications, 184, pp. 1165-1171. <a href="http://arxiv.org/pdf/1208.2407">PDF</a></p>
+      </section>
+      <footer>
+        <p>This project is maintained by <a href="https://github.com/peterwittek">peterwittek</a></p>
+        <p><small>Hosted on GitHub Pages &mdash; Theme by <a href="https://github.com/orderedlist">orderedlist</a></small></p>
+      </footer>
+    </div>
+    <script src="javascripts/scale.fix.js"></script>
+    
+  </body>
+</html>
