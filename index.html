@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="chrome=1">
-    <title>Trotter-suzuki-mpi by peterwittek</title>
+    <title>Trotter-Suzuki-Mpi by peterwittek</title>
 
     <link rel="stylesheet" href="stylesheets/styles.css">
     <link rel="stylesheet" href="stylesheets/pygment_trac.css">
@@ -15,7 +15,7 @@
   <body>
     <div class="wrapper">
       <header>
-        <h1>Trotter-suzuki-mpi</h1>
+        <h1>Trotter-Suzuki-Mpi</h1>
         <p>Distributed Trotter-Suzuki solver</p>
 
         <p class="view"><a href="https://github.com/peterwittek/trotter-suzuki-mpi">View the Project on GitHub <small>peterwittek/trotter-suzuki-mpi</small></a></p>
@@ -31,13 +31,13 @@
         <h1>
 <a name="distributed-trotter-suzuki-solver" class="anchor" href="#distributed-trotter-suzuki-solver"><span class="octicon octicon-link"></span></a>Distributed Trotter-Suzuki Solver</h1>
 
-<p>This is a distributed variant of efficient implementations of a simple Trotter-Suzuki solver. The kernels are based on the efficient <a href="https://bitbucket.org/zzzoom/trottersuzuki">implementation</a> by 
+<p>This is a distributed variant of efficient implementations of a Trotter-Suzuki solver with high-performance multicore, SSE, GPU, and hybrid kernels. The kernels are based on the <a href="https://bitbucket.org/zzzoom/trottersuzuki">implementation</a> by 
 Carlos Bederián</p>
 
 <h1>
 <a name="dependencies" class="anchor" href="#dependencies"><span class="octicon octicon-link"></span></a>Dependencies</h1>
 
-<p>CUDA and an MPI implementation are required for compiling. It also require a GPU with at least Compute Cabapility 2.0 for the CUDA kernel to execute.</p>
+<p>An MPI implementation is required for compiling. To use the GPU-accelerated version, CUDA and a GPU with at least Compute Cabapility 2.0 are necessary.</p>
 
 <h1>
 <a name="usage" class="anchor" href="#usage"><span class="octicon octicon-link"></span></a>Usage</h1>
@@ -70,6 +70,46 @@ Carlos Bederián</p>
 </code></pre>
 
 <p>The included shell script single2double.sh generates a double precision variant. Executing it will overwrite the single precision source code.</p>
+
+<h1>
+<a name="compilation--installation" class="anchor" href="#compilation--installation"><span class="octicon octicon-link"></span></a>Compilation &amp; Installation</h1>
+
+<p>From GIT repository first run</p>
+
+<pre><code>$ ./autogen.sh
+</code></pre>
+
+<p>Then follow the standard POSIX procedure:</p>
+
+<pre><code>$ ./configure [options]
+$ make
+$ make install
+</code></pre>
+
+<p>Options for configure</p>
+
+<pre><code>--prefix=PATH           Set directory prefix for installation
+</code></pre>
+
+<p>By default, the executable is installed into /usr/local. If you prefer a
+different location, use this option to select an installation
+directory.</p>
+
+<pre><code>--with-mpi=MPIROOT      Use MPI root directory.
+--with-mpi-compilers=DIR or --with-mpi-compilers=yes
+                          use MPI compiler (mpicxx) found in directory DIR, or
+                          in your PATH if =yes
+--with-mpi-libs="LIBS"  MPI libraries [default "-lmpi"]
+--with-mpi-incdir=DIR   MPI include directory [default MPIROOT/include]
+--with-mpi-libdir=DIR   MPI library directory [default MPIROOT/lib]
+</code></pre>
+
+<p>The above flags allow the identification of the correct MPI library the user wishes to use. The flags are especially useful if MPI is installed in a non-standard location, or when multiple MPI libraries are available.</p>
+
+<pre><code>--with-cuda=/path/to/cuda           Set path for CUDA
+</code></pre>
+
+<p>The configure script looks for CUDA in /usr/local/cuda. If your installation is not there, then specify the path with this parameter. If you do not want CUDA enabled, set the parameter to <code>--without-cuda</code>.</p>
 
 <h1>
 <a name="citation" class="anchor" href="#citation"><span class="octicon octicon-link"></span></a>Citation</h1>
