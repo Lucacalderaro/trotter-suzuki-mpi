@@ -760,7 +760,7 @@ CPUBlockSSEKernel::CPUBlockSSEKernel(double *_p_real, double *_p_imag, double *e
 
     assert (tile_width % 2 == 0);
     assert (tile_height % 2 == 0);
-    /*
+    
     posix_memalign(reinterpret_cast<void**>(&r00[0]), 64, ((tile_width * tile_height) / 4) * sizeof(double));
     posix_memalign(reinterpret_cast<void**>(&r00[1]), 64, ((tile_width * tile_height) / 4) * sizeof(double));
     posix_memalign(reinterpret_cast<void**>(&r01[0]), 64, ((tile_width * tile_height) / 4) * sizeof(double));
@@ -786,7 +786,7 @@ CPUBlockSSEKernel::CPUBlockSSEKernel(double *_p_real, double *_p_imag, double *e
     posix_memalign(reinterpret_cast<void**>(&ext_pot_i01), 64, ((tile_width * tile_height) / 4) * sizeof(double));
     posix_memalign(reinterpret_cast<void**>(&ext_pot_i10), 64, ((tile_width * tile_height) / 4) * sizeof(double));
     posix_memalign(reinterpret_cast<void**>(&ext_pot_i11), 64, ((tile_width * tile_height) / 4) * sizeof(double));
-    */
+    
 
 #ifdef WIN32
     r00[0] = reinterpret_cast<double*>(_aligned_malloc(((tile_width * tile_height) / 4) * sizeof(double), 64));
@@ -813,7 +813,7 @@ CPUBlockSSEKernel::CPUBlockSSEKernel(double *_p_real, double *_p_imag, double *e
     ext_pot_i01 = reinterpret_cast<double*>(_aligned_malloc(((tile_width * tile_height) / 4) * sizeof(double), 64));
     ext_pot_i10 = reinterpret_cast<double*>(_aligned_malloc(((tile_width * tile_height) / 4) * sizeof(double), 64));
     ext_pot_i11 = reinterpret_cast<double*>(_aligned_malloc(((tile_width * tile_height) / 4) * sizeof(double), 64));
-#else
+
     r00[0] = reinterpret_cast<double*>(aligned_alloc(64, ((tile_width * tile_height) / 4) * sizeof(double)));
     r00[1] = reinterpret_cast<double*>(aligned_alloc(64, ((tile_width * tile_height) / 4) * sizeof(double)));
     r01[0] = reinterpret_cast<double*>(aligned_alloc(64, ((tile_width * tile_height) / 4) * sizeof(double)));
