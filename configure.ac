@@ -34,7 +34,7 @@ if [[[ $string == *"ICC"* ]]]
 then  
   CXXFLAGS="${CXXFLAGS}"
 else
-  AS_IF([test "x$GXX" = "xyes"],[CXXFLAGS="${CXXFLAGS} -Ofast -march=native"])
+  AS_IF([test "x$GXX" = "xyes"],[CXXFLAGS="${CXXFLAGS} -O3 -march=native"])
 fi
 
 #find out what version we are running
