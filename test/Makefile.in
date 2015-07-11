@@ -28,7 +28,7 @@ NVCC       	   = @NVCC@
 MPI_INC        = @MPI_INC@
 MPI_LIBDIR     = @MPI_LIBDIR@
 MPI_LIBS       = @MPI_LIBS@
-TEST_LIBS      = @TEST_LIBS@
+
 
 # VPATH-related substitution variables
 srcdir	 = ./../src
@@ -39,7 +39,7 @@ ifdef CUDA_LIBS
 	LIBOBJS+=$(srcdir)/cc2kernel.cu.co $(srcdir)/hybrid.cu.co
 endif
 
-TEST_OBJS=$(LIBOBJS) cpublocktest.o unittest.o
+TEST_OBJS=$(LIBOBJS) unittest.o
 
 all: check
 
