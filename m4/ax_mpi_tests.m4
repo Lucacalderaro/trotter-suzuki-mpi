@@ -25,20 +25,6 @@ AC_PREPROC_IFELSE(
   AC_MSG_ERROR(cannot find mpi.h)
 ])
 
-AC_MSG_CHECKING(whether we can compile mpi.h)
-AC_COMPILE_IFELSE(
-[AC_LANG_SOURCE([[#include "mpi.h"]],[[int c; char** v; MPI_Init(&c,&v);]])],
-[
-  AC_MSG_RESULT(yes)
-  AC_DEFINE(HAVE_MPI,,[define that mpi is being used])
-],[
-  AC_MSG_RESULT(no)
-  echo "---"
-  echo "mpi.h has compile errors"
-  echo "View the mpi options with \"configure --help\", and provide a valid MPI."
-  echo "---"
-  AC_MSG_ERROR(invalid mpi.h)
-])
 
 AC_SUBST([MPI_INC])
 AC_SUBST([MPI_LIBDIR])
