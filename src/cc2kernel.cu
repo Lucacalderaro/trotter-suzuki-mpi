@@ -128,19 +128,19 @@ inline __device__ void trotter_vert_pair_flexible_nosync(double a, double b, int
     if (py >= BACKWARDS && py < tile_height - 1 + BACKWARDS && ky >= BACKWARDS && ky < BLOCK_HEIGHT - 1 + BACKWARDS) {
         peer_r = rl[ky_peer][kx];
         peer_i = im[ky_peer][kx];
-#ifndef DISABLE_FMA
+//#ifndef DISABLE_FMA
         rl[ky_peer][kx] = a * peer_r - b * cell_i;
         im[ky_peer][kx] = a * peer_i + b * cell_r;
         cell_r = a * cell_r - b * peer_i;
         cell_i = a * cell_i + b * peer_r;
-#else
+/*#else
         // NOTE: disabling FMA has worse precision and performance
         //       use only for exact implementation verification against CPU results
         rl[ky_peer][kx] = __dadd_rn(a * peer_r, - b * cell_i);
         im[ky_peer][kx] = __dadd_rn(a * peer_i, b * cell_r);
         cell_r = __dadd_rn(a * cell_r, - b * peer_i);
         cell_i = __dadd_rn(a * cell_i, b * peer_r);
-#endif
+#endif*/
     }
 }
 
@@ -154,19 +154,19 @@ static  inline __device__ void trotter_horz_pair_flexible_nosync(double a, doubl
     if (px >= BACKWARDS && px < tile_width - 1 + BACKWARDS && kx >= BACKWARDS && kx < BLOCK_WIDTH - 1 + BACKWARDS) {
         peer_r = rl[ky][kx_peer];
         peer_i = im[ky][kx_peer];
-#ifndef DISABLE_FMA
+//#ifndef DISABLE_FMA
         rl[ky][kx_peer] = a * peer_r - b * cell_i;
         im[ky][kx_peer] = a * peer_i + b * cell_r;
         cell_r = a * cell_r - b * peer_i;
         cell_i = a * cell_i + b * peer_r;
-#else
+/*#else
         // NOTE: disabling FMA has worse precision and performance
         //       use only for exact implementation verification against CPU results
         rl[ky][kx_peer] = __dadd_rn(a * peer_r, - b * cell_i);
         im[ky][kx_peer] = __dadd_rn(a * peer_i, b * cell_r);
         cell_r = __dadd_rn(a * cell_r, - b * peer_i);
         cell_i = __dadd_rn(a * cell_i, b * peer_r);
-#endif
+#endif*/
     }
 }
 
@@ -190,14 +190,14 @@ static  inline __device__ void trotter_external_pot_nosync(int tile_width, int t
         peer_r = rl[ky_peer][kx];
         peer_i = im[ky_peer][kx];
 
-#ifndef DISABLE_FMA
+//#ifndef DISABLE_FMA
         var = cell_r;
         cell_r = pot_cell_r * var - pot_cell_i * cell_i;
         cell_i = pot_cell_r * cell_i + pot_cell_i * var;
 
         rl[ky_peer][kx] = pot_peer_r * peer_r - pot_peer_i * peer_i;
         im[ky_peer][kx] = pot_peer_r * peer_i + pot_peer_i * peer_r;
-#else
+/*#else
         // NOTE: disabling FMA has worse precision and performance
         //       use only for exact implementation verification against CPU results
         var = cell_r;
@@ -206,7 +206,7 @@ static  inline __device__ void trotter_external_pot_nosync(int tile_width, int t
 
         rl[ky_peer][kx] = __dadd_rn(pot_peer_r * peer_r, - pot_peer_i * peer_i);
         im[ky_peer][kx] = __dadd_rn(pot_peer_r * peer_i, pot_peer_i * peer_r);
-#endif
+#endif*/
     }
 }
 
@@ -354,19 +354,19 @@ inline __device__ void imag_trotter_vert_pair_flexible_nosync(double a, double b
     if (py >= BACKWARDS && py < tile_height - 1 + BACKWARDS && ky >= BACKWARDS && ky < BLOCK_HEIGHT - 1 + BACKWARDS) {
         peer_r = rl[ky_peer][kx];
         peer_i = im[ky_peer][kx];
-#ifndef DISABLE_FMA
+//#ifndef DISABLE_FMA
         rl[ky_peer][kx] = a * peer_r + b * cell_r;
         im[ky_peer][kx] = a * peer_i + b * cell_i;
         cell_r = a * cell_r + b * peer_r;
         cell_i = a * cell_i + b * peer_i;
-#else
+/*#else
         // NOTE: disabling FMA has worse precision and performance
         //       use only for exact implementation verification against CPU results
         rl[ky_peer][kx] = __dadd_rn(a * peer_r, b * cell_r);
         im[ky_peer][kx] = __dadd_rn(a * peer_i, b * cell_i);
         cell_r = __dadd_rn(a * cell_r, b * peer_r);
         cell_i = __dadd_rn(a * cell_i, b * peer_i);
-#endif
+#endif*/
     }
 }
 
@@ -380,19 +380,19 @@ static  inline __device__ void imag_trotter_horz_pair_flexible_nosync(double a, 
     if (px >= BACKWARDS && px < tile_width - 1 + BACKWARDS && kx >= BACKWARDS && kx < BLOCK_WIDTH - 1 + BACKWARDS) {
         peer_r = rl[ky][kx_peer];
         peer_i = im[ky][kx_peer];
-#ifndef DISABLE_FMA
+//#ifndef DISABLE_FMA
         rl[ky][kx_peer] = a * peer_r + b * cell_r;
         im[ky][kx_peer] = a * peer_i + b * cell_i;
         cell_r = a * cell_r + b * peer_r;
         cell_i = a * cell_i + b * peer_i;
-#else
+/*#else
         // NOTE: disabling FMA has worse precision and performance
         //       use only for exact implementation verification against CPU results
         rl[ky][kx_peer] = __dadd_rn(a * peer_r, b * cell_r);
         im[ky][kx_peer] = __dadd_rn(a * peer_i, b * cell_i);
         cell_r = __dadd_rn(a * cell_r, b * peer_r);
         cell_i = __dadd_rn(a * cell_i, b * peer_i);
-#endif
+#endif*/
     }
 }
 
