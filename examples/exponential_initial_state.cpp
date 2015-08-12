@@ -30,6 +30,9 @@
 #include <iostream>
 #include <complex>
 #include <sys/stat.h>
+#include <sys/time.h>
+#include <unistd.h>
+#include <stdlib.h>
 
 #include "common.h"
 #include "trotter.h"
@@ -49,6 +52,84 @@ std::complex<double> exp_state(int x, int y, int matrix_width, int matrix_height
     return exp(std::complex<double>(0. , 2 * 3.14159 / L_x * (x - periods[1] * halo_x) + 2 * 3.14159 / L_y * (y - periods[0] * halo_y) ));
 }
 
+void process_command_line(int argc, char** argv, int *dim, int *iterations, int *snapshots, int *kernel_type, char *filename, char * pot_name, bool *imag_time) {
+    // Setting default values
+    *dim = DIM;
+    *iterations = ITERATIONS;
+    *snapshots = SNAPSHOTS;
+    *kernel_type = KERNEL_TYPE;
+   
+
+    int c;
+    bool file_supplied = false;
+    int kinetic_par = 0;
+    while ((c = getopt (argc, argv, "gd:i:k:s:n:p:")) != -1) {
+        switch (c) {
+        case 'g':
+            *imag_time = true;
+            break;
+        case 'd':
+            *dim = atoi(optarg);
+            if (*dim <= 0) {
+                fprintf (stderr, "The argument of option -d should be a positive integer.\n");
+                abort ();
+            }
+            break;
+        case 'i':
+            *iterations = atoi(optarg);
+            if (*iterations <= 0) {
+                fprintf (stderr, "The argument of option -i should be a positive integer.\n");
+                abort ();
+            }
+            break;
+
+        case 'k':
+            *kernel_type = atoi(optarg);
+            if (*kernel_type < 0 || *kernel_type > 3) {
+                fprintf (stderr, "The argument of option -k should be a valid kernel.\n");
+                abort ();
+            }
+            break;
+        case 's':
+            *snapshots = atoi(optarg);
+            if (*snapshots <= 0) {
+                fprintf (stderr, "The argument of option -s should be a positive integer.\n");
+                abort ();
+            }
+            break;
+        case 'n':
+            for(size_t i = 0; i < strlen(optarg); i++)
+                filename[i] = optarg[i];
+            file_supplied = true;
+            break;
+        
+        case 'p':
+            for(size_t i = 0; i < strlen(optarg); i++)
+                pot_name[i] = optarg[i];
+            break;
+        
+        case '?':
+            if (optopt == 'd' || optopt == 'i' || optopt == 'k' || optopt == 's') {
+                fprintf (stderr, "Option -%c requires an argument.\n", optopt);
+                
+                abort ();
+            }
+            else if (isprint (optopt)) {
+                fprintf (stderr, "Unknown option `-%c'.\n", optopt);
+                
+                abort ();
+            }
+            else {
+                fprintf (stderr, "Unknown option character `\\x%x'.\n",  optopt);
+                
+                abort ();
+            }
+        
+        }
+    }
+    
+}
+
 int main(int argc, char** argv) {
 
     int dim = DIM, iterations = ITERATIONS, snapshots = SNAPSHOTS, kernel_type = KERNEL_TYPE;
@@ -61,7 +142,8 @@ int main(int argc, char** argv) {
     int matrix_width = dim + periods[1] * 2 * halo_x;
     int matrix_height = dim + periods[0] * 2 * halo_y;
     bool imag_time = false;
-
+    int time, tot_time = 0;
+    
     //define the topology
     int coords[2], dims[2] = {0, 0};
     int rank;
@@ -80,7 +162,8 @@ int main(int argc, char** argv) {
     dims[0] = dims[1] = 1;
     coords[0] = coords[1] = 0;
 #endif
-
+    process_command_line(argc, argv, &dim, &iterations, &snapshots, &kernel_type, filename, pot_name, &imag_time);
+    
     //set dimension of tiles and offsets
     int start_x, end_x, inner_start_x, inner_end_x,
         start_y, end_y, inner_start_y, inner_end_y;
@@ -110,13 +193,13 @@ int main(int argc, char** argv) {
     initialize_state(p_real, p_imag, filename, ini_state, tile_width, tile_height, matrix_width, matrix_height, start_x, start_y,
                      periods, coords, dims, halo_x, halo_y);
 
-    if(rank == 0) {
+    /*if(rank == 0) {
         std::cout << "\n* This source provides an example of the trotter-suzuki program.\n";
         std::cout << "* It calculates the time-evolution of a particle in a box\n";
         std::cout << "* with periodic boundary conditions, where the initial\n";
         std::cout << "* state is the following:\n";
         std::cout << "* \texp(i2M_PI / L (x + y))\n\n";
-    }
+    }*/
 
     //set file output directory
     std::stringstream dirname;
@@ -143,9 +226,16 @@ int main(int argc, char** argv) {
           , cartcomm
 #endif
          );*/
+    struct timeval start, end;
     for(int count_snap = 1; count_snap <= snapshots; count_snap++) {
+        gettimeofday(&start, NULL);
+        
         trotter(h_a, h_b, external_pot_real, external_pot_imag, p_real, p_imag, matrix_width, matrix_height, iterations, kernel_type, periods, imag_time);
-
+    
+        gettimeofday(&end, NULL);
+        time = (end.tv_sec - start.tv_sec) * 1000000 + (end.tv_usec - start.tv_usec);
+        tot_time += time;
+                
        /* stamp(p_real, p_imag, matrix_width, matrix_height, halo_x, halo_y, start_x, inner_start_x, inner_end_x,
               start_y, inner_start_y, inner_end_y, dims, coords, periods,
               0, iterations, count_snap, dirnames.c_str()
@@ -155,7 +245,7 @@ int main(int argc, char** argv) {
              );*/
     }
     if (coords[0] == 0 && coords[1] == 0 && verbose == true) {
-        std::cout << "TROTTER " << matrix_width - periods[1] * 2 * halo_x << "x" << matrix_height - periods[0] * 2 * halo_y << " kernel:" << kernel_type << " np:" << nProcs << std::endl;
+        std::cout << "TROTTER " << matrix_width - periods[1] * 2 * halo_x << "x" << matrix_height - periods[0] * 2 * halo_y << " kernel:" << kernel_type << " np:" << nProcs << " " << tot_time << std::endl;
     }
 #ifdef HAVE_MPI
     MPI_Finalize();
