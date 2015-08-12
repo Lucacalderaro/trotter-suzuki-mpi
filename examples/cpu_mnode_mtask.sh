@@ -1,4 +1,4 @@
-!/bin/bash
+#!/bin/bash
 # @ job_name= prova
 # @ initialdir= .
 # @ output= prova.out
