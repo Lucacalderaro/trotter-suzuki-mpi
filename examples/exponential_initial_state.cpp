@@ -137,10 +137,6 @@ int main(int argc, char** argv) {
     bool verbose = true;
     char filename[1] = "";
     char pot_name[1] = "";
-    int halo_x = (kernel_type == 2 ? 3 : 4);
-    int halo_y = 4;
-    int matrix_width = dim + periods[1] * 2 * halo_x;
-    int matrix_height = dim + periods[0] * 2 * halo_y;
     bool imag_time = false;
     int time, tot_time = 0;
     
@@ -163,6 +159,10 @@ int main(int argc, char** argv) {
     coords[0] = coords[1] = 0;
 #endif
     process_command_line(argc, argv, &dim, &iterations, &snapshots, &kernel_type, filename, pot_name, &imag_time);
+    int halo_x = (kernel_type == 2 ? 3 : 4);
+    int halo_y = 4;
+    int matrix_width = dim + periods[1] * 2 * halo_x;
+    int matrix_height = dim + periods[0] * 2 * halo_y;
     
     //set dimension of tiles and offsets
     int start_x, end_x, inner_start_x, inner_end_x,
