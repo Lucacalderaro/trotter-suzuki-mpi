@@ -1,4 +1,3 @@
-
 #!/bin/bash
 # @ job_name= prova
 # @ initialdir= .
