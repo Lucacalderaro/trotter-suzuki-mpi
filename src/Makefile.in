@@ -43,9 +43,7 @@ MEX_LIBS=-lgomp
 
 platform=$(shell uname -s)
 
-ifneq ($(platform),Darwin)
-	LIBOBJS+=cpublocksse.o 
-endif
+
 
 ifdef CUDA_LIBS
 	LIBOBJS+=cc2kernel.cu.co hybrid.cu.co
