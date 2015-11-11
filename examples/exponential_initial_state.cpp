@@ -30,6 +30,7 @@
 #include <iostream>
 #include <complex>
 #include <sys/stat.h>
+#include <sys/time.h>
 
 #include "common.h"
 #include "trotter.h"
@@ -69,6 +70,7 @@ int main(int argc, char** argv) {
     int matrix_width = dim + periods[1] * 2 * halo_x;
     int matrix_height = dim + periods[0] * 2 * halo_y;
     bool imag_time = false;
+    int time, tot_time = 0;
 
     //define the topology
     int coords[2], dims[2] = {0, 0};
@@ -151,9 +153,16 @@ int main(int argc, char** argv) {
           , cartcomm
 #endif
          );
+         
+    struct timeval start, end;
     for(int count_snap = 1; count_snap <= snapshots; count_snap++) {
+        gettimeofday(&start, NULL);
         trotter(h_a, h_b, coupling_const, external_pot_real, external_pot_imag, omega, rot_coord_x, rot_coord_y, p_real, p_imag, delta_x, delta_y, matrix_width, matrix_height, delta_t, iterations, kernel_type, periods, norm, imag_time);
-
+        
+        gettimeofday(&end, NULL);
+        time = (end.tv_sec - start.tv_sec) * 1000000 + (end.tv_usec - start.tv_usec);
+        tot_time += time;
+        
         stamp(p_real, p_imag, matrix_width, matrix_height, halo_x, halo_y, start_x, inner_start_x, inner_end_x, end_x,
               start_y, inner_start_y, inner_end_y, dims, coords, periods,
               0, iterations, count_snap, dirnames.c_str()
@@ -163,7 +172,7 @@ int main(int argc, char** argv) {
              );
     }
     if (coords[0] == 0 && coords[1] == 0 && verbose == true) {
-        std::cout << "TROTTER " << matrix_width - periods[1] * 2 * halo_x << "x" << matrix_height - periods[0] * 2 * halo_y << " kernel:" << kernel_type << " np:" << nProcs << std::endl;
+        std::cout << "TROTTER " << matrix_width - periods[1] * 2 * halo_x << "x" << matrix_height - periods[0] * 2 * halo_y << " kernel:" << kernel_type << " np:" << nProcs << " " << tot_time << std::endl;
     }
 #ifdef HAVE_MPI
     MPI_Finalize();
