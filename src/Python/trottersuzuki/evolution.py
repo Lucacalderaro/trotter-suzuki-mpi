@@ -1,9 +1,9 @@
 import numpy as np
-from .trottersuzuki import solver, H, K, Lz, Norm2, phase, density
+from .trottersuzuki import solver, H, K, Lz, Norm2, phase, density, Norm2_2GPE, H_2GPE
 
 
-def evolve(p_real, p_imag, particle_mass, external_potential, omega, rot_coord_x, rot_coord_y, delta_x, delta_y,
-           delta_t, iterations, coupling_const=0.0, kernel_type=0,
+def evolve(p_real, p_imag, pb_real, pb_imag, particle_mass, external_potential, external_potential_b, omega, rot_coord_x, rot_coord_y, delta_x, delta_y,
+           delta_t, iterations, coupling_const, kernel_type=0,
            periods=None, imag_time=False):
     """Function for evolving a quantum state.
 
@@ -47,7 +47,7 @@ def evolve(p_real, p_imag, particle_mass, external_potential, omega, rot_coord_x
         external_potential = np.zeros(p_real.shape)
     if periods is None:
         periods = [0, 0]
-    solver(p_real, p_imag, particle_mass, coupling_const, external_potential, omega, rot_coord_x, rot_coord_y,
+    solver(p_real, p_imag, pb_real, pb_imag, particle_mass, coupling_const, external_potential, external_potential_b, omega, rot_coord_x, rot_coord_y,
            delta_x, delta_y, delta_t, iterations, kernel_type, periods,
            imag_time)
 
@@ -75,6 +75,11 @@ def calculate_total_energy(p_real, p_imag, particle_mass, external_potential, om
         external_potential = np.zeros(p_real.shape)
     return H(p_real, p_imag, particle_mass, coupling_const, external_potential, omega, coord_rot_x, coord_rot_y,
              delta_x, delta_y)
+
+
+def calculate_total_energy_2GPE(p_real, p_imag, pb_real, pb_imag, particle_mass, coupling_const, external_pot_a, external_pot_b, omega, coord_rot_x, coord_rot_y, delta_x, delta_y):
+
+     return H_2GPE(p_real, p_imag, pb_real, pb_imag, particle_mass, coupling_const, external_pot_a, external_pot_b, omega, coord_rot_x, coord_rot_y, delta_x, delta_y)
 
 
 def calculate_kinetic_energy(p_real, p_imag, particle_mass, delta_x, delta_y):
@@ -129,6 +134,10 @@ def calculate_norm2(p_real, p_imag, delta_x, delta_y):
     """
     return Norm2(p_real, p_imag, delta_x, delta_y)
 
+
+def calculate_norm2_2GPE(p_real, p_imag, pb_real, pb_imag, delta_x, delta_y):
+
+    return Norm2_2GPE(p_real, p_imag, pb_real, pb_imag, delta_x, delta_y)
 
 def get_wave_function_phase(p_real, p_imag):
     """Function that return the phase of the wave function
