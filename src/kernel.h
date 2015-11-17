@@ -38,7 +38,9 @@ public:
     virtual void run_kernel() = 0;
     virtual void run_kernel_on_halo() = 0;
     virtual void wait_for_completion(int iteration) = 0;
-    virtual void get_sample(size_t dest_stride, size_t x, size_t y, size_t width, size_t height, double * dest_real, double * dest_imag) const = 0;
+    virtual void get_sample(size_t dest_stride, size_t x, size_t y, size_t width, size_t height, double ** dest_real, double ** dest_imag) const = 0;
+    virtual void rabi_coupling(double var, double delta_t) = 0;
+    virtual void normalization() = 0;
 
     virtual bool runs_in_place() const = 0;
     virtual std::string get_name() const = 0;
