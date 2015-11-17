@@ -945,6 +945,7 @@ CPUBlockSSEKernel::~CPUBlockSSEKernel() {
 #endif
 }
 
+void CPUBlockSSEKernel::rabi_coupling(double var, double delta_t) {}
 
 void CPUBlockSSEKernel::run_kernel_on_halo() {
     int inner = 0, sides = 0;
@@ -1071,8 +1072,8 @@ void CPUBlockSSEKernel::wait_for_completion(int iteration) {
 }
 
 
-void CPUBlockSSEKernel::get_sample(size_t dest_stride, size_t x, size_t y, size_t width, size_t height, double * dest_real, double * dest_imag) const {
-    get_quadrant_sample(r00[sense], r01[sense], r10[sense], r11[sense], i00[sense], i01[sense], i10[sense], i11[sense], tile_width / 2, dest_stride, x, y, width, height, dest_real, dest_imag);
+void CPUBlockSSEKernel::get_sample(size_t dest_stride, size_t x, size_t y, size_t width, size_t height, double ** dest_real, double ** dest_imag) const {
+    get_quadrant_sample(r00[sense], r01[sense], r10[sense], r11[sense], i00[sense], i01[sense], i10[sense], i11[sense], tile_width / 2, dest_stride, x, y, width, height, dest_real[0], dest_imag[0]);
 }
 
 void CPUBlockSSEKernel::start_halo_exchange() {

@@ -200,13 +200,15 @@ int main(int argc, char** argv) {
     int time, tot_time = 0;
     char output_folder[2] = {'.', '\0'};
 	double delta_t = 0;
-	double coupling_const = 0;
+	double coupling_const[6];
+	for (int i = 1; i < 6; i++)
+		coupling_const[i] = 0;
 	double delta_x = 1, delta_y = 1;
 
 #ifdef HAVE_MPI
     MPI_Init(&argc, &argv);
 #endif
-    process_command_line(argc, argv, &dim, &delta_x, &delta_y, &iterations, &snapshots, &kernel_type, filename, &delta_t, &coupling_const, &particle_mass, pot_name, &imag_time);
+    process_command_line(argc, argv, &dim, &delta_x, &delta_y, &iterations, &snapshots, &kernel_type, filename, &delta_t, &coupling_const[0], &particle_mass, pot_name, &imag_time);
 	
     int halo_x = (kernel_type == 2 ? 3 : 4);
     int halo_y = 4;
@@ -245,8 +247,12 @@ int main(int argc, char** argv) {
 
 	//set and calculate evolution operator variables from hamiltonian
 	double time_single_it;
-	double *external_pot_real = new double[tile_width * tile_height];
-	double *external_pot_imag = new double[tile_width * tile_height];
+	double *external_pot_real[2];
+	double *external_pot_imag[2];
+	external_pot_real[0] = new double[tile_width * tile_height];
+	external_pot_imag[0] = new double[tile_width * tile_height];
+	external_pot_real[1] = NULL;
+	external_pot_imag[1] = NULL;
 	double (*hamiltonian_pot)(int x, int y, int matrix_width, int matrix_height, int * periods, int halo_x, int halo_y);
 	hamiltonian_pot = const_potential;
 
@@ -265,19 +271,23 @@ int main(int argc, char** argv) {
 			h_b = sin(time_single_it / (2. * particle_mass));
 		}
 	}
-	initialize_exp_potential(external_pot_real, external_pot_imag, pot_name, hamiltonian_pot, tile_width, tile_height, matrix_width, matrix_height,
+	initialize_exp_potential(external_pot_real[0], external_pot_imag[0], pot_name, hamiltonian_pot, tile_width, tile_height, matrix_width, matrix_height,
 							 start_x, start_y, periods, coords, dims, halo_x, halo_y, time_single_it, particle_mass, imag_time);
 
 	//set initial state
-	double *p_real = new double[tile_width * tile_height];
-	double *p_imag = new double[tile_width * tile_height];
+	double *p_real[2];
+	double *p_imag[2];
+	p_real[0] = new double[tile_width * tile_height];
+	p_imag[0] = new double[tile_width * tile_height];
+	p_real[1] = NULL;
+	p_imag[1] = NULL;
 	std::complex<double> (*ini_state)(int x, int y, int matrix_width, int matrix_height, int * periods, int halo_x, int halo_y);
 	ini_state = NULL;
-	initialize_state(p_real, p_imag, filename, ini_state, tile_width, tile_height, matrix_width, matrix_height, start_x, start_y,
+	initialize_state(p_real[0], p_imag[0], filename, ini_state, tile_width, tile_height, matrix_width, matrix_height, start_x, start_y,
 					 periods, coords, dims, halo_x, halo_y, read_offset);
 
 	for(int count_snap = 0; count_snap <= snapshots; count_snap++) {
-		stamp(p_real, p_imag, matrix_width, matrix_height, halo_x, halo_y, start_x, inner_start_x, inner_end_x, end_x,
+		stamp(p_real[0], p_imag[0], matrix_width, matrix_height, halo_x, halo_y, start_x, inner_start_x, inner_end_x, end_x,
 			  start_y, inner_start_y, inner_end_y, dims, coords, periods,
 			  0, iterations, count_snap, output_folder
 #ifdef HAVE_MPI

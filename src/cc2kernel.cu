@@ -672,6 +672,8 @@ CC2Kernel::~CC2Kernel() {
     cudaStreamDestroy(stream2);
 }
 
+void CC2Kernel::rabi_coupling(double var, double delta_t) {}
+
 void CC2Kernel::run_kernel_on_halo() {
     int inner = 0, horizontal = 0, vertical = 0;
     inner = 0;
@@ -755,13 +757,13 @@ void CC2Kernel::copy_results() {
     CUDA_SAFE_CALL(cudaMemcpy(p_imag, pdev_imag[sense], tile_width * tile_height * sizeof(double), cudaMemcpyDeviceToHost));
 }
 
-void CC2Kernel::get_sample(size_t dest_stride, size_t x, size_t y, size_t width, size_t height, double * dest_real, double * dest_imag) const {
+void CC2Kernel::get_sample(size_t dest_stride, size_t x, size_t y, size_t width, size_t height, double ** dest_real, double ** dest_imag) const {
     assert(x < tile_width);
     assert(y < tile_height);
     assert(x + width <= tile_width);
     assert(y + height <= tile_height);
-    CUDA_SAFE_CALL(cudaMemcpy2D(dest_real, dest_stride * sizeof(double), &(pdev_real[sense][y * tile_width + x]), tile_width * sizeof(double), width * sizeof(double), height, cudaMemcpyDeviceToHost));
-    CUDA_SAFE_CALL(cudaMemcpy2D(dest_imag, dest_stride * sizeof(double), &(pdev_imag[sense][y * tile_width + x]), tile_width * sizeof(double), width * sizeof(double), height, cudaMemcpyDeviceToHost));
+    CUDA_SAFE_CALL(cudaMemcpy2D(dest_real[0], dest_stride * sizeof(double), &(pdev_real[sense][y * tile_width + x]), tile_width * sizeof(double), width * sizeof(double), height, cudaMemcpyDeviceToHost));
+    CUDA_SAFE_CALL(cudaMemcpy2D(dest_imag[0], dest_stride * sizeof(double), &(pdev_imag[sense][y * tile_width + x]), tile_width * sizeof(double), width * sizeof(double), height, cudaMemcpyDeviceToHost));
 }
 
 void CC2Kernel::start_halo_exchange() {

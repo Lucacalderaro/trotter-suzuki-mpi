@@ -42,10 +42,10 @@
 #include "hybrid.h"
 #endif
 
-void trotter(double h_a, double h_b, double coupling_const,
-             double * external_pot_real, double * external_pot_imag,
+void trotter(double h_a, double h_b, double *coupling_const,
+             double ** external_pot_real, double ** external_pot_imag,
              double omega, int rot_coord_x, int rot_coord_y,
-             double * p_real, double * p_imag, double delta_x, double delta_y,
+             double ** p_real, double ** p_imag, double delta_x, double delta_y,
              const int matrix_width, const int matrix_height, double delta_t,
              const int iterations, const int kernel_type,
              int *periods, double norm, bool imag_time) {
@@ -79,11 +79,25 @@ void trotter(double h_a, double h_b, double coupling_const,
     int width = end_x - start_x;
     int height = end_y - start_y;
 
+    if(p_real[1] == NULL) {
+		p_real[1] = new double [width * height];
+		p_imag[1] = new double [width * height];
+		ini_matrix_zero(width, height, p_real[1], p_imag[1]);
+	}
+	if(external_pot_real[1] == NULL) {
+		external_pot_real[1] = new double [width * height];
+		external_pot_imag[1] = new double [width * height];
+		ini_matrix_zero(width, height, external_pot_real[1], external_pot_imag[1]);
+	}
+    
+    for(int i = 0; i < 4; i++)
+		coupling_const[i] *= delta_t;
+    
     // Initialize kernel
     ITrotterKernel * kernel;
     switch (kernel_type) {
     case 0:
-        kernel = new CPUBlock(p_real, p_imag, external_pot_real, external_pot_imag, h_a, h_b, coupling_const * delta_t, delta_x, delta_y, matrix_width, matrix_height, halo_x, halo_y, periods, norm, imag_time, omega * delta_t * delta_x / (2 * delta_y), omega * delta_t * delta_y / (2 * delta_x), rot_coord_x, rot_coord_y
+        kernel = new CPUBlock(p_real, p_imag, external_pot_real, external_pot_imag, h_a, h_b, coupling_const, delta_x, delta_y, matrix_width, matrix_height, halo_x, halo_y, periods, norm, imag_time, omega * delta_t * delta_x / (2 * delta_y), omega * delta_t * delta_y / (2 * delta_x), rot_coord_x, rot_coord_y
 #ifdef HAVE_MPI
                               , cartcomm
 #endif
@@ -93,7 +107,7 @@ void trotter(double h_a, double h_b, double coupling_const,
     case 1:
 #ifndef WIN32
 #ifndef __APPLE__
-        kernel = new CPUBlockSSEKernel(p_real, p_imag, external_pot_real, external_pot_imag, h_a, h_b, delta_x, delta_y, matrix_width, matrix_height, halo_x, halo_y, periods, norm, imag_time
+        kernel = new CPUBlockSSEKernel(p_real[0], p_imag[0], external_pot_real[0], external_pot_imag[0], h_a, h_b, delta_x, delta_y, matrix_width, matrix_height, halo_x, halo_y, periods, norm, imag_time
 #ifdef HAVE_MPI
                                        , cartcomm
 #endif
@@ -114,7 +128,7 @@ void trotter(double h_a, double h_b, double coupling_const,
 
     case 2:
 #ifdef CUDA
-        kernel = new CC2Kernel(p_real, p_imag, external_pot_real, external_pot_imag, h_a, h_b, delta_x, delta_y, matrix_width, matrix_height, halo_x, halo_y, periods, norm, imag_time
+        kernel = new CC2Kernel(p_real[0], p_imag[0], external_pot_real[0], external_pot_imag[0], h_a, h_b, delta_x, delta_y, matrix_width, matrix_height, halo_x, halo_y, periods, norm, imag_time
 #ifdef HAVE_MPI
                                , cartcomm
 #endif
@@ -133,7 +147,7 @@ void trotter(double h_a, double h_b, double coupling_const,
 
     case 3:
 #ifdef CUDA
-        kernel = new HybridKernel(p_real, p_imag, external_pot_real, external_pot_imag, h_a, h_b, delta_x, delta_y, matrix_width, matrix_height, halo_x, halo_y, periods, norm, imag_time
+        kernel = new HybridKernel(p_real[0], p_imag[0], external_pot_real[0], external_pot_imag[0], h_a, h_b, delta_x, delta_y, matrix_width, matrix_height, halo_x, halo_y, periods, norm, imag_time
 #ifdef HAVE_MPI
                                   , cartcomm
 #endif
@@ -151,16 +165,21 @@ void trotter(double h_a, double h_b, double coupling_const,
         break;
 
     default:
-        kernel = new CPUBlock(p_real, p_imag, external_pot_real, external_pot_imag, h_a, h_b, coupling_const * delta_t, delta_x, delta_y, matrix_width, matrix_height, halo_x, halo_y, periods, norm, imag_time, omega * delta_t * delta_x / ( 2 * delta_y), omega * delta_t * delta_y / ( 2 * delta_x), rot_coord_x, rot_coord_y
+        kernel = new CPUBlock(p_real, p_imag, external_pot_real, external_pot_imag, h_a, h_b, coupling_const, delta_x, delta_y, matrix_width, matrix_height, halo_x, halo_y, periods, norm, imag_time, omega * delta_t * delta_x / ( 2 * delta_y), omega * delta_t * delta_y / ( 2 * delta_x), rot_coord_x, rot_coord_y
 #ifdef HAVE_MPI
                               , cartcomm
 #endif
                              );
         break;
     }
-
+    double var = 0.5;
+	if(p_real[1] != NULL) {
+		kernel->rabi_coupling(var, delta_t);
+		var = 1.;
+	}
     // Main loop
     for (int i = 0; i < iterations; i++) {
+        // first wave function
         kernel->run_kernel_on_halo();
         if (i != iterations - 1) {
             kernel->start_halo_exchange();
@@ -169,7 +188,24 @@ void trotter(double h_a, double h_b, double coupling_const,
         if (i != iterations - 1) {
             kernel->finish_halo_exchange();
         }
-        kernel->wait_for_completion(i);
+        kernel->wait_for_completion(i);      
+        //second wave function
+        if(p_real[1] != NULL) {
+			kernel->run_kernel_on_halo();
+			if (i != iterations - 1) {
+				kernel->start_halo_exchange();
+			}
+			kernel->run_kernel();
+			if (i != iterations - 1) {
+				kernel->finish_halo_exchange();
+			}
+			kernel->wait_for_completion(i);
+		        
+			if (i == iterations - 1)
+				var = 0.5;
+			kernel->rabi_coupling(var, delta_t);
+		}	
+        kernel->normalization();
     }
 
     kernel->get_sample(width, 0, 0, width, height, p_real, p_imag);
