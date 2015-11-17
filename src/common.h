@@ -33,6 +33,7 @@
 
 #include "trotter.h"
 
+void ini_matrix_zero(size_t tile_width, size_t tile_height, double *real, double *imag);
 void calculate_borders(int coord, int dim, int * start, int *end, int *inner_start, int *inner_end, int length, int halo, int periodic_bound);
 void print_complex_matrix(char * filename, double * matrix_real, double * matrix_imag, size_t stride, size_t width, size_t height);
 void print_matrix(const char * filename, double * matrix, size_t stride, size_t width, size_t height);
@@ -87,4 +88,16 @@ double Energy_tot(double * p_real, double * p_imag,
 				  int matrix_width, int matrix_height, int halo_x, int halo_y, int * periods);
 void get_wave_function_phase(double * phase, double * p_real, double * p_imag, int inner_start_x, int start_x, int inner_end_x, int end_x, int inner_start_y, int start_y, int inner_end_y, int end_y);
 void get_wave_function_density(double * density, double * p_real, double * p_imag, int inner_start_x, int start_x, int inner_end_x, int end_x, int inner_start_y, int start_y, int inner_end_y, int end_y);
+
+double Norm2_2GPE(double **p_real, double **p_imag, double delta_x, double delta_y, int inner_start_x, int start_x, int inner_end_x, int end_x, int inner_start_y, int start_y, int inner_end_y, int end_y);
+double Energy_rabi_coupling_2GPE(double **p_real, double **p_imag, double omega_r, double omega_i, double norm2, double delta_x, double delta_y, int inner_start_x, int start_x, int inner_end_x, int end_x, int inner_start_y, int start_y, int inner_end_y, int end_y);
+double Energy_ab_2GPE(double **p_real, double **p_imag, double coupling_const_ab, double norm2, double delta_x, double delta_y, int inner_start_x, int start_x, int inner_end_x, int end_x, int inner_start_y, int start_y, int inner_end_y, int end_y);
+double Energy_tot_2GPE(double ** p_real, double ** p_imag,
+				       double particle_mass, double *coupling_const, 
+				       double (*hamilt_pot_a)(int x, int y, int matrix_width, int matrix_height, int * periods, int halo_x, int halo_y),
+				       double (*hamilt_pot_b)(int x, int y, int matrix_width, int matrix_height, int * periods, int halo_x, int halo_y), 
+				       double ** external_pot, 
+				       double omega, double coord_rot_x, double coord_rot_y,
+				       double delta_x, double delta_y, double norm2, int inner_start_x, int start_x, int inner_end_x, int end_x, int inner_start_y, int start_y, int inner_end_y, int end_y,
+				       int matrix_width, int matrix_height, int halo_x, int halo_y, int * periods);
 #endif
