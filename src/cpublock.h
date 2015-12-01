@@ -43,8 +43,8 @@ void block_kernel_horizontal_imaginary(size_t start_offset, size_t stride, size_
 
 class CPUBlock: public ITrotterKernel {
 public:
-    CPUBlock(double **_p_real, double **_p_imag, double **_external_pot_real, double **_external_pot_imag, double _a, double _b, double *_coupling_const, double _delta_x, double _delta_y, 
-             int matrix_width, int matrix_height, int _halo_x, int _halo_y, int *_periods, double _norm, bool _imag_time, double _alpha_x, double _alpha_y, int _rot_coord_x, int _rot_coord_y
+    CPUBlock(double **_p_real, double **_p_imag, double **_external_pot_real, double **_external_pot_imag, double *_a, double *_b, double *_coupling_const, double _delta_x, double _delta_y, 
+             int matrix_width, int matrix_height, int _halo_x, int _halo_y, int *_periods, double *_norm, bool _imag_time, double _alpha_x, double _alpha_y, int _rot_coord_x, int _rot_coord_y
 #ifdef HAVE_MPI
              , MPI_Comm cartcomm
 #endif
@@ -75,10 +75,10 @@ private:
     double *p_imag[2][2];
     double *external_pot_real[2];
     double *external_pot_imag[2];
-    double a;
-    double b;
+    double *a;
+    double *b;
     double delta_x, delta_y;
-    double norm;
+    double *norm, tot_norm;
     double *coupling_const;
     int sense, state;
     size_t halo_x, halo_y, tile_width, tile_height;
