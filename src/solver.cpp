@@ -1,5 +1,6 @@
 #include <cmath>
 #include <complex>
+#include <iostream>
 
 #include "trotter.h"
 
@@ -126,7 +127,7 @@ void ini_external_pot(double *external_pot_real, double *external_pot_imag, doub
 }
 
 void solver(double * p_real, double * p_imag, double * pb_real, double * pb_imag,
-			double particle_mass, double *coupling_const, double * external_pot, double * external_pot_b, double omega, int rot_coord_x, int rot_coord_y,
+			double particle_mass_a, double particle_mass_b, double *coupling_const, double * external_pot, double * external_pot_b, double omega, int rot_coord_x, int rot_coord_y,
             const int matrix_width, const int matrix_height, double delta_x, double delta_y, double delta_t, const int iterations, const int kernel_type, int *periods, bool imag_time) {
 	
 	int halo_x = (kernel_type == 2 ? 3 : 10);
@@ -151,24 +152,26 @@ void solver(double * p_real, double * p_imag, double * pb_real, double * pb_imag
 	}
     
     //calculate norm of the state
-    double norm = 0;
+    double norm[2];
+    norm[0] = 0;
+    norm[1] = 0;
     if(imag_time == true) {
 		for(int i = 0; i < matrix_height; i++) {
 			for(int j = 0; j < matrix_width; j++) {
-				norm += delta_x * delta_y * (p_real[j + i * matrix_width] * p_real[j + i * matrix_width] + p_imag[j + i * matrix_width] * p_imag[j + i * matrix_width]);
+				norm[0] += delta_x * delta_y * (p_real[j + i * matrix_width] * p_real[j + i * matrix_width] + p_imag[j + i * matrix_width] * p_imag[j + i * matrix_width]);
 			}
 		}
 		if(pb_real != NULL) {
 			for(int i = 0; i < matrix_height; i++) {
 				for(int j = 0; j < matrix_width; j++) {
-					norm += delta_x * delta_y * (pb_real[j + i * matrix_width] * pb_real[j + i * matrix_width] + pb_imag[j + i * matrix_width] * pb_imag[j + i * matrix_width]);
+					norm[1] += delta_x * delta_y * (pb_real[j + i * matrix_width] * pb_real[j + i * matrix_width] + pb_imag[j + i * matrix_width] * pb_imag[j + i * matrix_width]);
 				}
 			}
 		}
 	}
 	
 	//calculate parameters for evolution operator
-	double h_a, h_b;
+	double h_a[2], h_b[2];
     double *external_pot_real[2];
     double *external_pot_imag[2];
     external_pot_real[0] = new double[dimx * dimy];
@@ -183,16 +186,20 @@ void solver(double * p_real, double * p_imag, double * pb_real, double * pb_imag
 		external_pot_imag[1] = new double[dimx * dimy];
 		ini_external_pot(external_pot_real[1], external_pot_imag[1], external_pot_b, delta_t, dimx, dimy, halo_x, halo_y, matrix_width, matrix_height, periods, imag_time);
 	}
-    
+  
     if(imag_time) {
-		h_a = cosh(delta_t / (4. * particle_mass * delta_x * delta_y));
-		h_b = sinh(delta_t / (4. * particle_mass * delta_x * delta_y));	
+		h_a[0] = cosh(delta_t / (4. * particle_mass_a * delta_x * delta_y));
+		h_b[0] = sinh(delta_t / (4. * particle_mass_a * delta_x * delta_y));	
+		h_a[1] = cosh(delta_t / (4. * particle_mass_b * delta_x * delta_y));
+		h_b[1] = sinh(delta_t / (4. * particle_mass_b * delta_x * delta_y));	
     }
     else {
-		h_a = cos(delta_t / (4. * particle_mass * delta_x * delta_y));
-		h_b = sin(delta_t / (4. * particle_mass * delta_x * delta_y));
+		h_a[0] = cos(delta_t / (4. * particle_mass_a * delta_x * delta_y));
+		h_b[0] = sin(delta_t / (4. * particle_mass_a * delta_x * delta_y));
+		h_a[1] = cos(delta_t / (4. * particle_mass_b * delta_x * delta_y));
+		h_b[1] = sin(delta_t / (4. * particle_mass_b * delta_x * delta_y));
     }
-	
+ 	
 	//launch kernel
 	trotter(h_a, h_b, coupling_const, external_pot_real, external_pot_imag, omega, rot_coord_x, rot_coord_y, _p_real, _p_imag, delta_x, delta_y, dimx, dimy, delta_t, iterations, kernel_type, periods, norm, imag_time);
 	

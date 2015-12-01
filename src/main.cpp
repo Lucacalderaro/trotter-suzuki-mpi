@@ -46,7 +46,8 @@
 #define ITERATIONS 1000
 #define KERNEL_TYPE 0
 #define SNAPSHOTS 1
-#define PARTICLE_MASS 1
+#define PARTICLE_MASS_A 1
+#define PARTICLE_MASS_B 1
 #define COUPLING_CONST 0
 #define FILENAME_LENGTH 255
 
@@ -57,7 +58,7 @@ void print_usage() {
     std::cout << "Usage:\n" \
               "     trotter [OPTION] -n filename\n" \
               "Arguments:\n" \
-              "     -m NUMBER     Particle mass (default: " << PARTICLE_MASS << ")\n"\
+              "     -m NUMBER     Particle mass (default: " << PARTICLE_MASS_A << ")\n"\
               "     -c NUMBER     Coupling constant of the self-interacting term (default: " << COUPLING_CONST << ")\n"\
               "     -d NUMBER     Matrix dimension (default: " << DIM << ")\n" \
               "     -l NUMBER     Physical dimension of the square lattice's edge (default: " << EDGE_LENGHT << ")\n" \
@@ -75,7 +76,7 @@ void print_usage() {
               "     -p STRING     Name of file that stores the potential operator (in coordinate representation)\n";
 }
 
-void process_command_line(int argc, char** argv, int *dim, double *delta_x, double *delta_y, int *iterations, int *snapshots, int *kernel_type, char *filename, double *delta_t, double *coupling_const, double *particle_mass, char * pot_name, bool *imag_time) {
+void process_command_line(int argc, char** argv, int *dim, double *delta_x, double *delta_y, int *iterations, int *snapshots, int *kernel_type, char *filename, double *delta_t, double *coupling_const, double *particle_mass_a, double *particle_mass_b, char * pot_name, bool *imag_time) {
     // Setting default values
     *dim = DIM;
     *iterations = ITERATIONS;
@@ -83,7 +84,8 @@ void process_command_line(int argc, char** argv, int *dim, double *delta_x, doub
     *kernel_type = KERNEL_TYPE;
     *delta_t = double(SINGLE_TIME_STEP);
     *coupling_const = double(COUPLING_CONST);
-    *particle_mass = double(PARTICLE_MASS);
+    *particle_mass_a = double(PARTICLE_MASS_A);
+    *particle_mass_b = double(PARTICLE_MASS_B);
 
 	double lenght = double(EDGE_LENGHT);
     int c;
@@ -134,7 +136,8 @@ void process_command_line(int argc, char** argv, int *dim, double *delta_x, doub
             *coupling_const = atoi(optarg);
             break;
         case 'm':
-            *particle_mass = atoi(optarg);
+            *particle_mass_a = atoi(optarg);
+            *particle_mass_b = atoi(optarg);
             if (delta_t <= 0) {
                 fprintf (stderr, "The argument of option -m should be a positive real number.\n");
                 abort ();
@@ -191,12 +194,12 @@ void process_command_line(int argc, char** argv, int *dim, double *delta_x, doub
 int main(int argc, char** argv) {
     int dim = 0, iterations = 0, snapshots = 0, kernel_type = 0;
     int periods[2] = {1, 1};
-    double particle_mass = 1.;
+    double particle_mass_a = 1., particle_mass_b = 1.;
     char filename[FILENAME_LENGTH] = "";
     char pot_name[FILENAME_LENGTH] = "";
     bool verbose = true, imag_time = false;
-    double h_a = .0, h_b = .0;
-    double norm = 1;
+    double h_a[2], h_b[2];
+    double norm[2]; norm[0] = 1;
     int time, tot_time = 0;
     char output_folder[2] = {'.', '\0'};
 	double delta_t = 0;
@@ -208,7 +211,7 @@ int main(int argc, char** argv) {
 #ifdef HAVE_MPI
     MPI_Init(&argc, &argv);
 #endif
-    process_command_line(argc, argv, &dim, &delta_x, &delta_y, &iterations, &snapshots, &kernel_type, filename, &delta_t, &coupling_const[0], &particle_mass, pot_name, &imag_time);
+    process_command_line(argc, argv, &dim, &delta_x, &delta_y, &iterations, &snapshots, &kernel_type, filename, &delta_t, &coupling_const[0], &particle_mass_a, &particle_mass_b, pot_name, &imag_time);
 	
     int halo_x = (kernel_type == 2 ? 3 : 4);
     int halo_y = 4;
@@ -257,22 +260,21 @@ int main(int argc, char** argv) {
 	hamiltonian_pot = const_potential;
 
 	if(imag_time) {
-		double constant = 6.;
-		time_single_it = delta_t / 2.;	//second approx trotter-suzuki: time/2
-		if(h_a == 0. && h_b == 0.) {
-			h_a = cosh(time_single_it / (2. * particle_mass)) / constant;
-			h_b = sinh(time_single_it / (2. * particle_mass)) / constant;
-		}
+		time_single_it = delta_t / 2.;	//second approx trotter-suzuki: time/2		
+		h_a[0] = cosh(time_single_it / (2. * particle_mass_a * delta_x * delta_y));
+		h_b[0] = sinh(time_single_it / (2. * particle_mass_a * delta_x * delta_y));
+		h_a[1] = cosh(time_single_it / (2. * particle_mass_b * delta_x * delta_y));
+		h_b[1] = sinh(time_single_it / (2. * particle_mass_b * delta_x * delta_y));
 	}
 	else {
 		time_single_it = delta_t / 2.;	//second approx trotter-suzuki: time/2
-		if(h_a == 0. && h_b == 0.) {
-			h_a = cos(time_single_it / (2. * particle_mass));
-			h_b = sin(time_single_it / (2. * particle_mass));
-		}
+		h_a[0] = cos(time_single_it / (2. * particle_mass_a * delta_x * delta_y));
+		h_b[0] = sin(time_single_it / (2. * particle_mass_a * delta_x * delta_y));
+		h_a[1] = cos(time_single_it / (2. * particle_mass_b * delta_x * delta_y));
+		h_b[1] = sin(time_single_it / (2. * particle_mass_b * delta_x * delta_y));
 	}
 	initialize_exp_potential(external_pot_real[0], external_pot_imag[0], pot_name, hamiltonian_pot, tile_width, tile_height, matrix_width, matrix_height,
-							 start_x, start_y, periods, coords, dims, halo_x, halo_y, time_single_it, particle_mass, imag_time);
+							 start_x, start_y, periods, coords, dims, halo_x, halo_y, time_single_it, particle_mass_a, imag_time);
 
 	//set initial state
 	double *p_real[2];

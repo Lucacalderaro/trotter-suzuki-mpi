@@ -48,16 +48,16 @@
 
 */
 
-void trotter(double h_a, double h_b, double *coupling_const,
+void trotter(double *h_a, double *h_b, double *coupling_const,
              double ** external_pot_real, double ** external_pot_imag,
              double omega, int rot_coord_x, int rot_coord_y,
              double ** p_real, double ** p_imag, double delta_x, double delta_y,
              const int matrix_width, const int matrix_height, double delta_t,
              const int iterations, const int kernel_type,
-             int *periods, double norm, bool imag_time);
+             int *periods, double *norm, bool imag_time);
              
 void solver(double * p_real, double * p_imag, double * pb_real, double * pb_imag,
-			double particle_mass, double *coupling_const, double * external_pot, double * external_pot_b, double omega, int rot_coord_x, int rot_coord_y,
+			double particle_mass_a, double particle_mass_b, double *coupling_const, double * external_pot, double * external_pot_b, double omega, int rot_coord_x, int rot_coord_y,
             const int matrix_width, const int matrix_height, double delta_x, double delta_y, double delta_t, const int iterations, const int kernel_type, int *periods, bool imag_time);
 
 struct energy_momentum_statistics {
@@ -86,7 +86,7 @@ void get_wave_function_density(double * density, double * p_real, double * p_ima
 
 double Norm2_2GPE(double **p_real, double **p_imag, double delta_x, double delta_y, int inner_start_x, int start_x, int inner_end_x, int end_x, int inner_start_y, int start_y, int inner_end_y, int end_y);
 double Energy_tot_2GPE(double ** p_real, double ** p_imag,
-				       double particle_mass, double *coupling_const, 
+				       double particle_mass_a, double particle_mass_b, double *coupling_const, 
 				       double (*hamilt_pot_a)(int x, int y, int matrix_width, int matrix_height, int * periods, int halo_x, int halo_y),
 				       double (*hamilt_pot_b)(int x, int y, int matrix_width, int matrix_height, int * periods, int halo_x, int halo_y), 
 				       double ** external_pot, 

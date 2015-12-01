@@ -855,23 +855,28 @@ double Energy_rot(double * p_real, double * p_imag,
 }
 
 double Energy_tot_2GPE(double ** p_real, double ** p_imag,
-				       double particle_mass, double *coupling_const, 
+				       double particle_mass_a, double particle_mass_b, double *coupling_const, 
 				       double (*hamilt_pot_a)(int x, int y, int matrix_width, int matrix_height, int * periods, int halo_x, int halo_y),
 				       double (*hamilt_pot_b)(int x, int y, int matrix_width, int matrix_height, int * periods, int halo_x, int halo_y), 
 				       double ** external_pot, 
 				       double omega, double coord_rot_x, double coord_rot_y,
 				       double delta_x, double delta_y, double norm2, int inner_start_x, int start_x, int inner_end_x, int end_x, int inner_start_y, int start_y, int inner_end_y, int end_y,
 				       int matrix_width, int matrix_height, int halo_x, int halo_y, int * periods) {
-					  
+					
+	if(external_pot == NULL) {
+		external_pot = new double* [2];
+		external_pot[0] = NULL;
+		external_pot[1] = NULL;
+	}
 	double sum = 0;
 	if(norm2 == 0)
 		norm2 = Norm2_2GPE(p_real, p_imag, delta_x, delta_y, inner_start_x, start_x, inner_end_x, end_x, inner_start_y, start_y, inner_end_y, end_y);
 	
-	sum += Energy_tot(p_real[0], p_imag[0], particle_mass, coupling_const[0], hamilt_pot_a, external_pot[0], omega, coord_rot_x, coord_rot_y, delta_x, delta_y, norm2, inner_start_x, start_x, inner_end_x, end_x, inner_start_y, start_y, inner_end_y, end_y, matrix_width, matrix_height, halo_x, halo_y, periods);
-	sum += Energy_tot(p_real[1], p_imag[1], particle_mass, coupling_const[1], hamilt_pot_b, external_pot[1], omega, coord_rot_x, coord_rot_y, delta_x, delta_y, norm2, inner_start_x, start_x, inner_end_x, end_x, inner_start_y, start_y, inner_end_y, end_y, matrix_width, matrix_height, halo_x, halo_y, periods);
+	sum += Energy_tot(p_real[0], p_imag[0], particle_mass_a, coupling_const[0], hamilt_pot_a, external_pot[0], omega, coord_rot_x, coord_rot_y, delta_x, delta_y, norm2, inner_start_x, start_x, inner_end_x, end_x, inner_start_y, start_y, inner_end_y, end_y, matrix_width, matrix_height, halo_x, halo_y, periods);
+	sum += Energy_tot(p_real[1], p_imag[1], particle_mass_b, coupling_const[1], hamilt_pot_b, external_pot[1], omega, coord_rot_x, coord_rot_y, delta_x, delta_y, norm2, inner_start_x, start_x, inner_end_x, end_x, inner_start_y, start_y, inner_end_y, end_y, matrix_width, matrix_height, halo_x, halo_y, periods);
 	sum += Energy_ab_2GPE(p_real, p_imag, coupling_const[2], norm2, delta_x, delta_y, inner_start_x, start_x, inner_end_x, end_x, inner_start_y, start_y, inner_end_y, end_y);
 	sum += Energy_rabi_coupling_2GPE(p_real, p_imag, coupling_const[3], coupling_const[4], norm2, delta_x, delta_y, inner_start_x, start_x, inner_end_x, end_x, inner_start_y, start_y, inner_end_y, end_y);
-	
+
 	return sum;
 }
 
