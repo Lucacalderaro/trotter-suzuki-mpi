@@ -1,7 +1,5 @@
 /**
- * Distributed Trotter-Suzuki solver
- * Copyright (C) 2015 Luca Calderaro, 2012-2015 Peter Wittek,
- * 2010-2012 Carlos Bederián
+ * Massively Parallel Trotter-Suzuki Solver
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,19 +17,19 @@
  */
 
 #undef _GLIBCXX_ATOMIC_BUILTINS
+#include <sstream>
 #include <cassert>
 #include <vector>
 #include <map>
-#include <stdio.h>
-
-#if HAVE_CONFIG_H
-#include "config.h"
-#endif
-#include "cc2kernel.h"
 #include "common.h"
-#ifdef HAVE_MPI
-#include <mpi.h>
-#endif
+#include "kernel.h"
+
+#define CUT_CHECK_ERROR(errorMessage) {                                      \
+    cudaError_t err = cudaGetLastError();                                    \
+    if( cudaSuccess != err) {                                                \
+      stringstream sstm;                                                     \
+      sstm << errorMessage <<"\n The error is " << cudaGetErrorString( err); \
+      my_abort(sstm.str());  }}
 
 /** Check and initialize a device attached to a node
  *  @param commRank - the MPI rank of this process
@@ -44,12 +42,12 @@ void setDevice(int commRank
                , MPI_Comm cartcomm
 #endif
               ) {
-    int commSize = 1;
     int devCount;
     int deviceNum = 0; //-1;
     CUDA_SAFE_CALL(cudaGetDeviceCount(&devCount));
 
 #ifdef HAVE_MPI
+    int commSize = 1;
     MPI_Comm_size(cartcomm, &commSize);
 #ifdef _WIN32
     FILE * fp = popen("hostname.exe", "r");
@@ -59,13 +57,13 @@ void setDevice(int commRank
     char buf[1024];
     if (fgets(buf, 1023, fp) == NULL) strcpy(buf, "localhost");
     pclose(fp);
-    std::string host = buf;
+    string host = buf;
     host = host.substr(0, host.size() - 1);
     strcpy(buf, host.c_str());
 
     if (commRank == 0) {
-        std::map<std::string, std::vector<int> > hosts;
-        std::map<std::string, int> devCounts;
+        map<string, vector<int> > hosts;
+        map<string, int> devCounts;
         MPI_Status stat;
         MPI_Request req;
 
@@ -86,7 +84,7 @@ void setDevice(int commRank
             else devCounts[buf] = devCount;
         }
         // check to make sure that we don't have more jobs on a node than we have GPUs.
-        for (std::map<std::string, std::vector<int> >::iterator it = hosts.begin(); it != hosts.end(); ++it) {
+        for (map<string, vector<int> >::iterator it = hosts.begin(); it != hosts.end(); ++it) {
             if (it->second.size() > static_cast<unsigned int>(devCounts[it->first])) {
                 printf("Error, more jobs running on '%s' than devices - %d jobs > %d devices.\n",
                        it->first.c_str(), static_cast<int>(it->second.size()), devCounts[it->first]);
@@ -97,7 +95,7 @@ void setDevice(int commRank
 
         // send out the device number for each process to use.
         MPI_Irecv(&deviceNum, 1, MPI_INT, 0, 0, cartcomm, &req);
-        for (std::map<std::string, std::vector<int> >::iterator it = hosts.begin(); it != hosts.end(); ++it) {
+        for (map<string, vector<int> >::iterator it = hosts.begin(); it != hosts.end(); ++it) {
             for (unsigned int i = 0; i < it->second.size(); ++i) {
                 int devID = i;
                 MPI_Send(&devID, 1, MPI_INT, it->second[i], 0, cartcomm);
@@ -559,42 +557,43 @@ void cc2kernel_wrapper(size_t tile_width, size_t tile_height, size_t offset_x, s
     CUT_CHECK_ERROR("Kernel error in cc2kernel_wrapper");
 }
 
-CC2Kernel::CC2Kernel(double *_p_real, double *_p_imag, double *_external_pot_real, double *_external_pot_imag, double _a, double _b, double _delta_x, double _delta_y, int matrix_width, int matrix_height, int _halo_x, int _halo_y, int *_periods, double _norm, bool _imag_time
-#ifdef HAVE_MPI
-                     , MPI_Comm _cartcomm
-#endif
-                    ):
-    p_real(_p_real),
-    p_imag(_p_imag),
+CC2Kernel::CC2Kernel(Lattice *grid, State *state, Hamiltonian *hamiltonian,
+                     double *_external_pot_real, double *_external_pot_imag,
+                     double _a, double _b, double delta_t,
+                     double _norm, bool _imag_time):
+    threadsPerBlock(BLOCK_X, STRIDE_Y),
     external_pot_real(_external_pot_real),
     external_pot_imag(_external_pot_imag),
-    threadsPerBlock(BLOCK_X, STRIDE_Y),
     sense(0),
     a(_a),
     b(_b),
-    delta_x(_delta_x),
-    delta_y(_delta_y),
-    halo_x(_halo_x),
-    halo_y(_halo_y),
     norm(_norm),
     imag_time(_imag_time) {
-
-    periods = _periods;
-    int rank, coords[2], dims[2] = {0, 0};
+    halo_x = grid->halo_x;
+    halo_y = grid->halo_y;
+    p_real = state->p_real;
+    p_imag = state->p_imag;
+    delta_x = grid->delta_x;
+    delta_y = grid->delta_y;
+    periods = grid->periods;
+    int rank;
 #ifdef HAVE_MPI
-    cartcomm = _cartcomm;
+    cartcomm = grid->cartcomm;
     MPI_Cart_shift(cartcomm, 0, 1, &neighbors[UP], &neighbors[DOWN]);
     MPI_Cart_shift(cartcomm, 1, 1, &neighbors[LEFT], &neighbors[RIGHT]);
     MPI_Comm_rank(cartcomm, &rank);
-    MPI_Cart_get(cartcomm, 2, dims, periods, coords);
 #else
     neighbors[UP] = neighbors[DOWN] = neighbors[LEFT] = neighbors[RIGHT] = 0;
-    dims[0] = dims[1] = 1;
     rank = 0;
-    coords[0] = coords[1] = 0;
 #endif
-    calculate_borders(coords[1], dims[1], &start_x, &end_x, &inner_start_x, &inner_end_x, matrix_width - 2 * periods[1]*halo_x, halo_x, periods[1]);
-    calculate_borders(coords[0], dims[0], &start_y, &end_y, &inner_start_y, &inner_end_y, matrix_height - 2 * periods[0]*halo_y, halo_y, periods[0]);
+    start_x = grid->start_x;
+    end_x = grid->end_x;
+    inner_start_x = grid->inner_start_x;
+    inner_end_x = grid->inner_end_x;
+    start_y = grid->start_y;
+    end_y = grid->end_y;
+    inner_start_y = grid->inner_start_y;
+    inner_end_y = grid->inner_end_y;
     tile_width = end_x - start_x;
     tile_height = end_y - start_y;
 
@@ -603,7 +602,6 @@ CC2Kernel::CC2Kernel(double *_p_real, double *_p_imag, double *_external_pot_rea
               , cartcomm
 #endif
              );
-
     CUDA_SAFE_CALL(cudaMalloc(reinterpret_cast<void**>(&dev_external_pot_real), tile_width * tile_height * sizeof(double)));
     CUDA_SAFE_CALL(cudaMalloc(reinterpret_cast<void**>(&dev_external_pot_imag), tile_width * tile_height * sizeof(double)));
     CUDA_SAFE_CALL(cudaMemcpy(dev_external_pot_real, external_pot_real, tile_width * tile_height * sizeof(double), cudaMemcpyHostToDevice));
@@ -617,6 +615,10 @@ CC2Kernel::CC2Kernel(double *_p_real, double *_p_imag, double *_external_pot_rea
     CUDA_SAFE_CALL(cudaMemcpy(pdev_imag[0], p_imag, tile_width * tile_height * sizeof(double), cudaMemcpyHostToDevice));
     cudaStreamCreate(&stream1);
     cudaStreamCreate(&stream2);
+    cublasStatus_t status = cublasCreate(&handle);
+    if (status != CUBLAS_STATUS_SUCCESS) {
+        my_abort("CuBLAS initialization error");
+    }
 
     // Halo exchange uses wave pattern to communicate
     int height = inner_end_y - inner_start_y;	// The vertical halo in rows
@@ -642,6 +644,13 @@ CC2Kernel::CC2Kernel(double *_p_real, double *_p_imag, double *_external_pot_rea
     CUDA_SAFE_CALL(cudaHostAlloc( (void **) &top_imag_receive, height * width * sizeof(double), cudaHostAllocDefault));
     CUDA_SAFE_CALL(cudaHostAlloc( (void **) &top_imag_send, height * width * sizeof(double), cudaHostAllocDefault));
 
+}
+
+void CC2Kernel::update_potential(double *_external_pot_real, double *_external_pot_imag) {
+    external_pot_real = _external_pot_real;
+    external_pot_imag = _external_pot_imag;
+    CUDA_SAFE_CALL(cudaMemcpy(dev_external_pot_real, external_pot_real, tile_width * tile_height * sizeof(double), cudaMemcpyHostToDevice));
+    CUDA_SAFE_CALL(cudaMemcpy(dev_external_pot_imag, external_pot_imag, tile_width * tile_height * sizeof(double), cudaMemcpyHostToDevice));
 }
 
 
@@ -670,6 +679,11 @@ CC2Kernel::~CC2Kernel() {
 
     cudaStreamDestroy(stream1);
     cudaStreamDestroy(stream2);
+
+    cublasStatus_t status = cublasDestroy(handle);
+    if (status != CUBLAS_STATUS_SUCCESS) {
+        my_abort("CuBLAS shutdown error");
+    }
 }
 
 void CC2Kernel::run_kernel_on_halo() {
@@ -711,42 +725,41 @@ void CC2Kernel::run_kernel() {
     CUT_CHECK_ERROR("Kernel error in CC2Kernel::run_kernel");
 }
 
+
+double CC2Kernel::calculate_squared_norm(bool global) {
+    double norm2 = 0., result_imag = 0.;
+    cublasStatus_t status = cublasDnrm2(handle, tile_width * tile_height, pdev_real[sense], 1, &norm2);
+    status = cublasDnrm2(handle, tile_width * tile_height, pdev_imag[sense], 1, &result_imag);
+    if (status != CUBLAS_STATUS_SUCCESS) {
+        my_abort("CuBLAS error");
+    }
+    norm2 = norm2*norm2 + result_imag*result_imag;
+#ifdef HAVE_MPI
+    if (global) {
+        int nProcs = 1;
+        MPI_Comm_size(cartcomm, &nProcs);
+        double *sums = new double[nProcs];
+        MPI_Allgather(&norm2, 1, MPI_DOUBLE, sums, 1, MPI_DOUBLE, cartcomm);
+        norm2 = 0.;
+        for(int i = 0; i < nProcs; i++)
+            norm2 += sums[i];
+        delete [] sums;
+    }
+#endif
+    return norm2 * delta_x * delta_y;
+}
+
 void CC2Kernel::wait_for_completion() {
     CUDA_SAFE_CALL(cudaDeviceSynchronize());
     //normalization
     if(imag_time) {
-
-        CUDA_SAFE_CALL(cudaMemcpy(p_real, pdev_real[sense], tile_width * tile_height * sizeof(double), cudaMemcpyDeviceToHost));
-        CUDA_SAFE_CALL(cudaMemcpy(p_imag, pdev_imag[sense], tile_width * tile_height * sizeof(double), cudaMemcpyDeviceToHost));
-
-        int nProcs = 1;
-#ifdef HAVE_MPI
-        MPI_Comm_size(cartcomm, &nProcs);
-#endif
-        double sum = 0., sums[nProcs];
-        for(int i = inner_start_y - start_y; i < inner_end_y - start_y; i++) {
-            for(int j = inner_start_x - start_x; j < inner_end_x - start_x; j++) {
-                sum += p_real[j + i * tile_width] * p_real[j + i * tile_width] + p_imag[j + i * tile_width] * p_imag[j + i * tile_width];
-            }
+        double tot_sum = calculate_squared_norm(true);
+        double inverse_norm = 1./sqrt(tot_sum / norm);
+        cublasStatus_t status = cublasDscal(handle, tile_width * tile_height, &inverse_norm, pdev_real[sense], 1);
+        status = cublasDscal(handle, tile_width * tile_height, &inverse_norm, pdev_imag[sense], 1);
+        if (status != CUBLAS_STATUS_SUCCESS) {
+            my_abort("CuBLAS error");
         }
-#ifdef HAVE_MPI
-        MPI_Allgather(&sum, 1, MPI_DOUBLE, sums, 1, MPI_DOUBLE, cartcomm);
-#else
-        sums[0] = sum;
-#endif
-        double tot_sum = 0.;
-        for(int i = 0; i < nProcs; i++)
-            tot_sum += sums[i];
-        double _norm = sqrt(tot_sum * delta_x * delta_y / norm);
-
-        for(int i = 0; i < tile_height; i++) {
-            for(int j = 0; j < tile_width; j++) {
-                p_real[j + i * tile_width] /= _norm;
-                p_imag[j + i * tile_width] /= _norm;
-            }
-        }
-        CUDA_SAFE_CALL(cudaMemcpy(pdev_real[sense], p_real, tile_width * tile_height * sizeof(double), cudaMemcpyHostToDevice));
-        CUDA_SAFE_CALL(cudaMemcpy(pdev_imag[sense], p_imag, tile_width * tile_height * sizeof(double), cudaMemcpyHostToDevice));
     }
 }
 
@@ -755,7 +768,10 @@ void CC2Kernel::copy_results() {
     CUDA_SAFE_CALL(cudaMemcpy(p_imag, pdev_imag[sense], tile_width * tile_height * sizeof(double), cudaMemcpyDeviceToHost));
 }
 
-void CC2Kernel::get_sample(size_t dest_stride, size_t x, size_t y, size_t width, size_t height, double * dest_real, double * dest_imag) const {
+void CC2Kernel::get_sample(size_t dest_stride, size_t x, size_t y,
+                           size_t width, size_t height,
+                           double *dest_real, double *dest_imag,
+                           double *dest_real2, double *dest_imag2) const {
     assert(x < tile_width);
     assert(y < tile_height);
     assert(x + width <= tile_width);
@@ -865,7 +881,7 @@ void CC2Kernel::finish_halo_exchange() {
 	height = inner_end_y - inner_start_y;	// The vertical halo in rows
 	width = halo_x;	// The number of columns of the matrix
 	stride = tile_width;	// The combined width of the matrix with the halo
-	
+
 	if(periods[1] != 0 || MPI) {
 		offset = (inner_start_y - start_y) * tile_width;
 		if (neighbors[LEFT] >= 0) {
@@ -882,7 +898,7 @@ void CC2Kernel::finish_halo_exchange() {
 	height = halo_y;	// The vertical halo in rows
 	width = tile_width;	// The number of columns of the matrix
 	stride = tile_width;	// The combined width of the matrix with the halo
-	
+
 	if(periods[0] != 0 || MPI) {
 		offset = 0;
 		if (neighbors[UP] >= 0) {

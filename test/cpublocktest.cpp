@@ -1,7 +1,5 @@
 /**
- * Distributed Trotter-Suzuki solver
- * Copyright (C) 2015 Luca Calderaro, 2012-2015 Peter Wittek,
- * 2010-2012 Carlos Bederián
+ * Massively Parallel Trotter-Suzuki Solver
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -20,8 +18,9 @@
 
 #include <iostream>
 #include "cpublocktest.h"
-#include "cpublock.h"
+#include "kernel.h"
 #include "common.h"
+#include "cpublock.cpp"
 
 CPPUNIT_TEST_SUITE_REGISTRATION( CPUBlockTest );
 

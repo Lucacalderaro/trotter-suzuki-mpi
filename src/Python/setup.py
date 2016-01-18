@@ -1,20 +1,52 @@
 """
 setup.py file
 """
-
 from setuptools import setup, Extension
-from setuptools.command.install import install
-from subprocess import call
+from setuptools.command.build_ext import build_ext
 import numpy
-import sys
 import os
+import sys
 import platform
+win_cuda_dir = ""
 
-sse = False
-# Path to CUDA on Linux and OS X
-cuda_dir = "/usr/local/cuda"
-# Path to CUDA library on Windows, 64 for 64 bit
-win_cuda_dir = "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v7.5"
+def find_cuda():
+    if 'CUDAHOME' in os.environ:
+        home = os.environ['CUDAHOME']
+        nvcc = os.path.join(home, 'bin', 'nvcc')
+    else:
+        nvcc = None
+        for dir in os.environ['PATH'].split(os.pathsep):
+            binpath = os.path.join(dir, 'nvcc')
+            if os.path.exists(binpath):
+                nvcc = os.path.abspath(binpath)
+        if nvcc is None:
+            raise EnvironmentError('The nvcc binary could not be located in '
+                                   'your $PATH. Either add it to your path, or'
+                                   'set $CUDAHOME')
+        home = os.path.dirname(os.path.dirname(nvcc))
+    cudaconfig = {'home': home, 'nvcc': nvcc,
+                  'include': os.path.join(home, 'include')}
+    for k, v in cudaconfig.items():
+        if not os.path.exists(v):
+            raise EnvironmentError('The CUDA %s path could not be located in '
+                                   '%s' % (k, v))
+    libdir = os.path.join(home, 'lib')
+    arch = int(platform.architecture()[0][0:2])
+    if sys.platform.startswith('win'):
+        os.path.join(libdir, "x"+str(arch))
+    if os.path.exists(os.path.join(home, libdir)):
+        cudaconfig['lib'] = libdir
+    elif os.path.exists(os.path.join(home, libdir + "64")):
+        cudaconfig['lib'] = libdir + "64"
+    else:
+        raise EnvironmentError('The CUDA libraries could not be located')
+    return cudaconfig
+
+try:
+    CUDA = find_cuda()
+except EnvironmentError:
+    CUDA = None
+    print("Proceeding without CUDA")
 
 try:
     numpy_include = numpy.get_include()
@@ -24,83 +56,88 @@ except AttributeError:
 
 arch = int(platform.architecture()[0][0:2])
 cmdclass = {}
+
+def customize_compiler_for_nvcc(self):
+    '''This is a verbatim copy of the NVCC compiler extension from
+    https://github.com/rmcgibbo/npcuda-example
+    '''
+    self.src_extensions.append('.cu')
+    default_compiler_so = self.compiler_so
+    super = self._compile
+
+    def _compile(obj, src, ext, cc_args, extra_postargs, pp_opts):
+        if os.path.splitext(src)[1] == '.cu':
+            self.set_executable('compiler_so', CUDA['nvcc'])
+            postargs = extra_postargs['nvcc']
+        else:
+            postargs = extra_postargs['cc']
+
+        super(obj, src, ext, cc_args, postargs, pp_opts)
+        self.compiler_so = default_compiler_so
+    self._compile = _compile
+
+
+# run the customize_compiler
+class custom_build_ext(build_ext):
+    def build_extensions(self):
+        customize_compiler_for_nvcc(self.compiler)
+        build_ext.build_extensions(self)
+
+cmdclass = {}
 if sys.platform.startswith('win') and os.path.exists(win_cuda_dir):
-    object_files = ['trottersuzuki/src/common.obj',
-                    'trottersuzuki/src/cpublock.obj',
-                    'trottersuzuki/src/cc2kernel.cu.obj',
-                    'trottersuzuki/src/hybrid.cu.obj',                    
-                    'trottersuzuki/src/trotter.obj',
-                    'trottersuzuki/src/solver.obj']
-    trottersuzuki_module = Extension('_trottersuzuki',
-                                     sources=['trottersuzuki/trotter_wrap.cxx'],
-                                     extra_objects=object_files,
-                                     define_macros=[('CUDA', None)],
-                                     library_dirs=[win_cuda_dir + 
-                                                   "/lib/x" + str(arch)],
-                                     libraries=['cudart', 'cublas'],
-                                     include_dirs=[numpy_include])
-elif os.path.exists(cuda_dir):
-  
-    class MyInstall(install):
-
-        def run(self):
-            os.chdir('trottersuzuki')
-            call(["./configure", "--without-mpi", "--with-cuda=" + cuda_dir])
-            call(["make", "lib"])
-            os.chdir('../')
-            install.run(self)
-
-    if arch == 32:
-        cuda_lib_dir = cuda_dir + "/lib"
-    else:
-        cuda_lib_dir = cuda_dir + "/lib64"
-    object_files = ['trottersuzuki/src/common.o',
-                    'trottersuzuki/src/cpublock.o',
-                    'trottersuzuki/src/cc2kernel.cu.co',
-                    'trottersuzuki/src/hybrid.cu.co',
-                    'trottersuzuki/src/trotter.o',
-                    'trottersuzuki/src/solver.o']
-
-    if os.path.isfile('trottersuzuki/src/cpublocksse.o'):
-        object_files.append('trottersuzuki/src/cpublocksse.o')
-
-    trottersuzuki_module = Extension('_trottersuzuki',
-                                     sources=['trottersuzuki/trotter_wrap.cxx'],
-                                     extra_objects=object_files,
-                                     define_macros=[('CUDA', None)],
-                                     library_dirs=[cuda_lib_dir],
-                                     libraries=['gomp', 'cudart', 'cublas'],
-                                     include_dirs=[numpy_include])
-    cmdclass = {'install': MyInstall}
-
+    arch = int(platform.architecture()[0][0:2])
+    ts_module = Extension('_trottersuzuki_wrap',
+                          sources=['trottersuzuki/trottersuzuki_wrap.cxx'],
+                          extra_objects=['trottersuzuki/src/common.obj',
+                                         'trottersuzuki/src/cpublock.obj',
+                                         'trottersuzuki/src/model.obj',
+                                         'trottersuzuki/src/solver.obj',
+                                         'trottersuzuki/src/cc2kernel.cu.obj'],
+                          define_macros=[('CUDA', None)],
+                          library_dirs=[win_cuda_dir+"/lib/x"+str(arch)],
+                          libraries=['cudart', 'cublas'],
+                          include_dirs=[numpy_include])
 else:
     if sys.platform.startswith('win'):
-        extra_compile_args = ['-openmp', '-DWIN32']
-        extra_link_args = []
+        extra_compile_args = {'cc': ['-openmp', '-DWIN32']}
+        libraries = None
+    elif sys.platform.startswith('darwin') and 'CC' not in os.environ:
+        extra_compile_args = {'cc': []}
+        libraries = None
     else:
-        extra_compile_args = ['-fopenmp']
+        extra_compile_args = {'cc': ['-fopenmp']}
         if 'CC' in os.environ and 'clang-omp' in os.environ['CC']:
-            extra_link_args = [
-                '-liomp5'
-            ]
+            libraries = ['iomp5']
         else:
-            extra_link_args = [
-                '-lgomp'
-            ]
+            libraries = ['gomp']
     sources_files = ['trottersuzuki/src/common.cpp',
                      'trottersuzuki/src/cpublock.cpp',
-                     'trottersuzuki/src/trotter.cpp',
+                     'trottersuzuki/src/model.cpp',
                      'trottersuzuki/src/solver.cpp',
-                     'trottersuzuki/trotter_wrap.cxx']
+                     'trottersuzuki/trottersuzuki_wrap.cxx']
 
-    if sse:
-        sources_files.append('trottersuzuki/src/cpublocksse.cpp')
+    ts_module = Extension('_trottersuzuki', sources=sources_files,
+                          include_dirs=[numpy_include, 'src'],
+                          extra_compile_args=extra_compile_args,
+                          libraries=libraries,
+                          )
+    if CUDA is not None:
+        ts_module.sources.append('trottersuzuki/src/cc2kernel.cu')
+        ts_module.define_macros = [('CUDA', None)]
+        ts_module.include_dirs.append(CUDA['include'])
+        ts_module.library_dirs = [CUDA['lib']]
+        ts_module.libraries += ['cudart', 'cublas']
+        ts_module.runtime_library_dirs = [CUDA['lib']]
+        if len(ts_module.extra_compile_args['cc']) > 0:
+            extra_args = ts_module.extra_compile_args['cc'][0]
+        else:
+            extra_args = ""
+        ts_module.extra_compile_args['nvcc']=['-use_fast_math',
+                                              '--ptxas-options=-v', '-c',
+                                              '--compiler-options','-fPIC ' +
+                                              extra_args]
+    cmdclass = {'build_ext': custom_build_ext}
 
-    trottersuzuki_module = Extension('_trottersuzuki',
-                                     sources=sources_files,
-                                     include_dirs=[numpy_include, 'src'],
-                                     extra_compile_args=extra_compile_args,
-                                     extra_link_args=extra_link_args)
 
 setup(name='trottersuzuki',
       version='1.4',
@@ -110,8 +147,7 @@ setup(name='trottersuzuki',
       url="http://trotter-suzuki-mpi.github.io/",
       platforms=["unix", "windows"],
       description="A massively parallel implementation of the Trotter-Suzuki decomposition",
-      ext_modules=[trottersuzuki_module],
-      py_modules=["trottersuzuki"],
+      ext_modules=[ts_module],
       packages=["trottersuzuki"],
       install_requires=['numpy'],
       cmdclass=cmdclass

@@ -5,7 +5,7 @@ AC_PREREQ([2.61])
 AC_INIT([trotter-suzuki], [1.4])
 m4_include([m4/ax_mpi_options.m4])
 m4_include([m4/ax_mpi_tests.m4])
-AC_CONFIG_SRCDIR([src/trotter.cpp])
+AC_CONFIG_SRCDIR([src/trottersuzuki.h])
 AC_CONFIG_HEADERS([config.h])
 
 # Checks for programs.
@@ -31,7 +31,7 @@ fi
 CXXFLAGS="${CXXFLAGS} ${OPENMP_CFLAGS}"
 
 if [[[ $string == *"ICC"* ]]]
-then  
+then
   CXXFLAGS="${CXXFLAGS}"
 else
   AS_IF([test "x$GXX" = "xyes"],[CXXFLAGS="${CXXFLAGS} -Ofast -march=native"])
@@ -46,31 +46,14 @@ else
   SUFFIX=""
 fi
 
-# Check if SSE kernel is requested
-# ------------------------------------------------------------------------------
-sse_enabled=no
-HAVE_SSE=0  
-AC_ARG_WITH([sse],
-   [  --with-sse   Compile with the SSE kernel included])
-if test x"$with_sse" = x"yes" ; then
-  AC_MSG_CHECKING(whether we can compile with SSE kernel)
-  AC_LANG([C++])
-  AC_COMPILE_IFELSE(
-  [AC_LANG_SOURCE([[#include <stdlib.h>]],
-                  [[const double * r00 = reinterpret_cast<double*>(aligned_alloc(64, sizeof(double)));]])],
-  [
-    AC_MSG_RESULT(yes)
-    HAVE_SSE=1
-    sse_enabled=yes
-  ],[
-    AC_MSG_RESULT(no)
-  ])
-fi
-AC_SUBST(HAVE_SSE)
-
 # Setup CUDA paths
 # ------------------------------------------------------------------------------
-CUDA_PATH=/usr/local/cuda
+if test -z "$CUDAHOME" ; then
+    CUDA_PATH=/usr/local/cuda
+else
+    CUDA_PATH="$CUDAHOME"
+fi
+
 AC_ARG_WITH([cuda],
    [  --with-cuda=PATH    prefix where cuda is installed [default=/usr/local/cuda]])
 
@@ -86,8 +69,12 @@ if test x"$with_cuda" != x"no" ; then
      cuda_enabled=yes
      CUDA_CFLAGS="-I$CUDA_PATH/include -use_fast_math -Xptxas "-v" -Xcompiler \"${CXXFLAGS}\""
      CXXFLAGS="${CXXFLAGS} -I$CUDA_PATH/include"
-     CUDA_LIBS="-lcudart"
-     CUDA_LDFLAGS="-L$CUDA_PATH/lib$SUFFIX"
+     CUDA_LIBS="-lcudart -lcublas"
+     if test -e "$CUDA_PATH/lib$SUFFIX"; then
+         CUDA_LDFLAGS="-L$CUDA_PATH/lib$SUFFIX"
+     else
+         CUDA_LDFLAGS="-L$CUDA_PATH/lib"
+     fi
      NVCC="$CUDA_PATH/bin/nvcc"
      AC_SUBST(CUDA_CFLAGS)
      AC_SUBST(CUDA_LIBS)
@@ -100,11 +87,11 @@ if test x"$with_cuda" != x"no" ; then
      echo "Building a version without CUDA.    "
      echo "---------------------------------------"
      cuda_enabled=no
-  else 
+  else
      cuda_enabled=no
   fi
 else
-  cuda_enabled=no  
+  cuda_enabled=no
 fi
 
 AM_CONDITIONAL([HAVE_CUDA], [test x"$cuda_enabled" = x"yes"])
@@ -115,7 +102,7 @@ AC_ARG_WITH([mpi],
    [  --with-mpi=PATH    prefix where MPI is installed])
 
 mpi_enabled=no
-if test x"$with_mpi" != x"no" ; then	
+if test x"$with_mpi" != x"no" ; then
     AX_MPI_OPTIONS
     if test x"$MPI_CXX" != x"none"; then
       AX_MPI_TESTS
